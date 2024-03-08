@@ -1,5 +1,6 @@
 import express from "express";
 import User from "../models/User.js"
+import Role from "../models/Role.js"
 import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken'
 import {validationResult} from 'express-validator'
@@ -14,10 +15,16 @@ class AuthController{
                 res.status(400).json({message: "Error of registration", errors})
             }
             const {username,email,password} = req.body
-            const user = await User.create({username,email,password})
-            res.status(201).send({user, message: "User create successfully!"})
+            const candidate = await User.findOne({username})
+            if(candidate){
+                return res.status(400).json({message: "User with this username already exist"})
+            }
+            const userRole = await Role.findOne({value:"USER"})
+            const user = new User({username,email,password, roles:[userRole.value]})
+            await user.save()
+            return res.json({ message: "User successfully registrated!"})
         } catch (e) {
-            res.status(400).send({error: "User already existed" })
+            return res.status(400).json({message: "Registration error" })
         }
     
     }
@@ -36,7 +43,8 @@ class AuthController{
             }
     
             const token = jwt.sign({
-                _id: user._id.toString()
+                _id: user._id.toString(),
+                roles: user.roles
             }, process.env.JWT_SECRET_KEY)
     
             res.send({user,token, message: "Logged in successfully"})
@@ -44,6 +52,8 @@ class AuthController{
             res.status(400).send({error: e })
         }
     }
+
+    
 }
 
 export default new AuthController()
